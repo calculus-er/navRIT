@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, render_template
 import networkx as nx
 import math
-
+#we are using networkx library to create a graph of the campus map.
 app = Flask(__name__)
 
 class CampusMap:
