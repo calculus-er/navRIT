@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Campus Navigator</title>
+    <title>NavRIT</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root {
@@ -55,8 +56,8 @@
         /* Theme Toggle Styles */
         .theme-toggle {
             position: fixed;
-            top: 30px;
-            right: 30px;
+            top: 20px;
+            right: 20px;
             cursor: pointer;
             background: var(--card-color);
             border-radius: 50%;
@@ -94,15 +95,42 @@
         }
 
         .map-container {
-            flex: 2;
-            background-color: var(--card-color);
-            padding: 2rem;
-            border-radius: 15px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            min-height: 600px;
-            display: flex;
-            flex-direction: column;
-        }
+    flex: 2;
+    background-color: var(--card-color);
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    min-height: 600px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Ensure content stays within bounds */
+    position: relative;
+}
+
+/* Ensure SVG is responsive */
+.map-svg {
+    width: 100%;
+    height: auto;
+}
+
+/* Make the content wrapper stack vertically on small screens */
+@media (max-width: 768px) {
+    .content-wrapper {
+        flex-direction: column;
+    }
+
+    .controls-container, .map-container {
+        width: 100%;
+        min-height: 400px; /* Ensure there's enough space for the map */
+    }
+
+    .map-svg {
+        height: 400px; /* Fixed height for mobile view */
+    }
+}
+
+
+
 
         .input-group {
             margin-bottom: 1.5rem;
@@ -112,7 +140,7 @@
         .input-group i {
             position: absolute;
             left: 1rem;
-            top: 50%;
+            top: 68%;
             transform: translateY(-50%);
             color: var(--primary-color);
         }
@@ -174,12 +202,24 @@
             overflow-y: auto;
         }
 
+        /* Ensure SVG is responsive */
         .map-svg {
-            width: 100%;
-            height: 500px;
-            background-color: var(--background-color);
-            border-radius: 8px;
-        }
+    width: 100%;
+    height: 600px; /* Adjust height for desktop */
+    display: block;
+}
+
+@media (max-width: 768px) {
+    .map-container {
+        min-height: 400px; /* Ensure there's enough space for the map */
+    }
+
+    .map-svg {
+        height: 400px; /* Adjust height for mobile */
+    }
+}
+
+
 
         .room-node {
             fill: var(--primary-color);
@@ -266,8 +306,8 @@
     </div>
 
     <div class="header">
-        <h1>Campus Navigator</h1>
-        <p>Find your way around campus with our interactive map</p>
+        <h1>NavRIT</h1>
+        <p>Navigate through RIT campus with our interactive map</p>
     </div>
 
     <div class="content-wrapper">
@@ -354,53 +394,67 @@
         }
 
         function drawMap(data) {
-            const svg = document.querySelector('.map-svg');
-            svg.innerHTML = ''; // Clear previous content
-            
-            // Create groups
-            const pathsGroup = document.createElementNS(SVG_NS, 'g');
-            const roomsGroup = document.createElementNS(SVG_NS, 'g');
-            const labelsGroup = document.createElementNS(SVG_NS, 'g');
-            const stairsGroup = document.createElementNS(SVG_NS, 'g');
-            
-            // Draw paths
-            data.relevant_paths.forEach(({start, end, type}) => {
-                const line = document.createElementNS(SVG_NS, 'line');
-                line.setAttribute('x1', start.x);
-                line.setAttribute('y1', start.y);
-                line.setAttribute('x2', end.x);
-                line.setAttribute('y2', end.y);
-                line.setAttribute('class', 'path-line');
-                pathsGroup.appendChild(line);
+    const svg = d3.select('.map-svg');
+    svg.html(''); // Clear previous content
 
-                if (type === 'stairs') {
-                    const stairsIcon = createStairsIcon(start.x, start.y, end.x, end.y);
-                    stairsGroup.appendChild(stairsIcon);
-                }
-            });
+    const svgWidth = svg.node().clientWidth;
+    const svgHeight = svg.node().clientHeight;
 
-            // Draw rooms and labels
-            data.path.forEach(room => {
-                const circle = document.createElementNS(SVG_NS, 'circle');
-                circle.setAttribute('cx', room.x);
-                circle.setAttribute('cy', room.y);
-                circle.setAttribute('class', 'room-node active');
-                roomsGroup.appendChild(circle);
+    // Define the clip path
+    svg.append('defs')
+        .append('clipPath')
+        .attr('id', 'clip')
+        .append('rect')
+        .attr('width', svgWidth)
+        .attr('height', svgHeight);
 
-                const text = document.createElementNS(SVG_NS, 'text');
-                text.setAttribute('x', parseInt(room.x) + 15);
-                text.setAttribute('y', parseInt(room.y) + 5);
-                text.setAttribute('class', 'room-label active');
-                text.textContent = `${room.id} - ${room.description}`;
-                labelsGroup.appendChild(text);
-            });
+    // Add zoom and pan functionality
+    const zoom = d3.zoom()
+        .scaleExtent([0.5, 8]) // Increased zoom out limit (0.5)
+        .translateExtent([[-svgWidth, -svgHeight], [2 * svgWidth, 2 * svgHeight]])
+        .on('zoom', (event) => {
+            g.attr('transform', event.transform);
+        });
 
-            // Add all groups to SVG
-            svg.appendChild(pathsGroup);
-            svg.appendChild(stairsGroup);
-            svg.appendChild(roomsGroup);
-            svg.appendChild(labelsGroup);
+    svg.call(zoom);
+
+    // Create groups with clipping path
+    const g = svg.append('g').attr('clip-path', 'url(#clip)');
+
+    // Draw paths
+    data.relevant_paths.forEach(({start, end, type}) => {
+        g.append('line')
+            .attr('x1', start.x)
+            .attr('y1', start.y)
+            .attr('x2', end.x)
+            .attr('y2', end.y)
+            .attr('class', 'path-line');
+
+        if (type === 'stairs') {
+            g.append(() => createStairsIcon(start.x, start.y, end.x, end.y));
         }
+    });
+
+    // Draw rooms and labels
+    data.path.forEach(room => {
+        g.append('circle')
+            .attr('cx', room.x)
+            .attr('cy', room.y)
+            .attr('class', 'room-node active');
+
+        g.append('text')
+            .attr('x', room.x + 15)
+            .attr('y', room.y + 5)
+            .attr('class', 'room-label active')
+            .text(`${room.id} - ${room.description}`);
+    });
+}
+
+
+
+
+
+
 
         function updateDirections(directions) {
             const directionsDiv = document.getElementById('directions');
