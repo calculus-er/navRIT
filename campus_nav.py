@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, render_template
 import networkx as nx
+import math
 
 app = Flask(__name__)
 
@@ -9,96 +10,122 @@ class CampusMap:
         self.add_rooms_and_connections()
     
     def add_rooms_and_connections(self):
-        # Rooms with coordinates for visual representation
-        # Format: (room no., room name, x, y)
+        # Rooms with coordinates and floor information
+        # Format: (room_id, description, x, y, floor)
         rooms = [
-            # Ground Floor
-            ("G01", "Main Entrance", 100, 400),
-            ("G02", "Reception", 300, 400),
-            ("G03", "Cafeteria", 500, 400),
-            ("G04", "Library", 300, 300),
+            # Ground Floor (floor 0)
+            ("G01", "Main Entrance", 100, 400, 0),
+            ("G02", "Reception", 300, 400, 0),
+            ("G03", "Cafeteria", 500, 400, 0),
+            ("G04", "Library", 300, 300, 0),
             
-            # First Floor
-            ("101", "Computer Lab", 100, 200),
-            ("102", "Physics Lab", 300, 200),
-            ("103", "Chemistry Lab", 500, 200),
-            ("104", "Classroom", 500, 100)
+            # First Floor (floor 1)
+            ("101", "Computer Lab", 100, 200, 1),
+            ("102", "Physics Lab", 300, 200, 1),
+            ("103", "Chemistry Lab", 500, 200, 1),
+            ("104", "Classroom", 500, 100, 1)
         ]
         
-        # Add rooms with coordinates
-        for room_id, description, x, y in rooms:
-            self.map.add_node(room_id, description=description, x=x, y=y)
+        # Add rooms with coordinates and floor information
+        for room_id, description, x, y, floor in rooms:
+            self.map.add_node(room_id, description=description, x=x, y=y, floor=floor)
         
-        # Add connections (paths between rooms)
+        # Add connections with type (normal/stairs)
         connections = [
-            ("G01", "G02"),
-            ("G02", "G03"),
-            ("G02", "G04"),
-            ("G03", "G04"),
-            ("G02", "102"),
-            ("101", "102"),
-            ("102", "103"),
-            ("103", "104")
+            ("G01", "G02", "normal"),  # Main Entrance to Reception
+            ("G02", "G03", "normal"),  # Reception to Cafeteria
+            ("G02", "G04", "normal"),  # Reception to Library
+            ("G03", "G04", "normal"),  # Cafeteria to Library
+            ("G02", "102", "stairs"),  # Reception to Physics Lab (stairs)
+            ("101", "102", "normal"),  # Computer Lab to Physics Lab
+            ("102", "103", "normal"),  # Physics Lab to Chemistry Lab
+            ("103", "104", "normal")   # Chemistry Lab to Classroom
         ]
-        self.map.add_edges_from(connections)
-    
-    def get_path_coordinates(self, path):
-        """Get coordinates for each room in the path"""
-        coordinates = []
-        for room in path:
-            x = self.map.nodes[room]['x']
-            y = self.map.nodes[room]['y']
-            coordinates.append({
-                'id': room,
-                'x': x,
-                'y': y,
-                'description': self.map.nodes[room]['description']
-            })
-        return coordinates
+        
+        # Add edges with connection type
+        for start, end, conn_type in connections:
+            self.map.add_edge(start, end, connection_type=conn_type)
 
-    def get_all_rooms(self):
-        """Get all rooms with their coordinates"""
-        return [{
-            'id': room,
-            'x': self.map.nodes[room]['x'],
-            'y': self.map.nodes[room]['y'],
-            'description': self.map.nodes[room]['description']
-        } for room in self.map.nodes()]
-
-    def get_all_paths(self):
-        """Get all connections for drawing the map"""
-        return [(
-            {
-                'id': start,
-                'x': self.map.nodes[start]['x'],
-                'y': self.map.nodes[start]['y']
-            },
-            {
-                'id': end,
-                'x': self.map.nodes[end]['x'],
-                'y': self.map.nodes[end]['y']
-            }
-        ) for start, end in self.map.edges()]
+    def get_direction_text(self, current, next_room):
+        """Generate detailed direction text between two adjacent rooms"""
+        curr_x = self.map.nodes[current]['x']
+        curr_y = self.map.nodes[current]['y']
+        next_x = self.map.nodes[next_room]['x']
+        next_y = self.map.nodes[next_room]['y']
+        curr_floor = self.map.nodes[current]['floor']
+        next_floor = self.map.nodes[next_room]['floor']
+        
+        # Calculate direction
+        dx = next_x - curr_x
+        dy = next_y - curr_y
+        
+        # Check if it's a stairs connection
+        if self.map[current][next_room]['connection_type'] == 'stairs':
+            if next_floor > curr_floor:
+                return f"Take the stairs up to {next_room} ({self.map.nodes[next_room]['description']})"
+            else:
+                return f"Take the stairs down to {next_room} ({self.map.nodes[next_room]['description']})"
+        
+        # Determine cardinal direction
+        direction = ""
+        if abs(dx) > abs(dy):
+            direction = "east" if dx > 0 else "west"
+        else:
+            direction = "north" if dy < 0 else "south"
+            
+        # Calculate distance (simplified units)
+        distance = math.sqrt(dx**2 + dy**2)
+        distance_text = "a short distance" if distance < 150 else "straight ahead"
+        
+        return f"Walk {distance_text} {direction} to {next_room} ({self.map.nodes[next_room]['description']})"
 
     def get_directions(self, start_room, end_room):
         try:
             path = nx.shortest_path(self.map, start_room, end_room)
-            coordinates = self.get_path_coordinates(path)
-            
-            # Generate text directions
+            coordinates = []
             directions = []
+            
+            # Get only the rooms and paths that are part of the route
+            relevant_rooms = set(path)
+            relevant_paths = [(path[i], path[i+1]) for i in range(len(path)-1)]
+            
+            # Generate detailed directions
             for i in range(len(path) - 1):
                 current = path[i]
                 next_room = path[i + 1]
-                current_desc = self.map.nodes[current]['description']
-                next_desc = self.map.nodes[next_room]['description']
-                directions.append(f"From {current} ({current_desc}), go to {next_room} ({next_desc})")
+                directions.append(self.get_direction_text(current, next_room))
+                
+            # Get coordinates for visualization
+            for room in path:
+                coordinates.append({
+                    'id': room,
+                    'x': self.map.nodes[room]['x'],
+                    'y': self.map.nodes[room]['y'],
+                    'description': self.map.nodes[room]['description'],
+                    'floor': self.map.nodes[room]['floor']
+                })
+            
+            # Get paths for visualization
+            path_coordinates = []
+            for start, end in relevant_paths:
+                path_coordinates.append({
+                    'start': {
+                        'id': start,
+                        'x': self.map.nodes[start]['x'],
+                        'y': self.map.nodes[start]['y']
+                    },
+                    'end': {
+                        'id': end,
+                        'x': self.map.nodes[end]['x'],
+                        'y': self.map.nodes[end]['y']
+                    },
+                    'type': self.map[start][end]['connection_type']
+                })
             
             return {
                 'directions': directions,
                 'path': coordinates,
-                'all_rooms': self.get_all_rooms(),
-                'all_paths': self.get_all_paths()
+                'relevant_paths': path_coordinates
             }
             
         except nx.NetworkXNoPath:
@@ -106,6 +133,7 @@ class CampusMap:
         except nx.NodeNotFound:
             return {'error': 'One or both rooms not found in the map'}
 
+# Create global instance
 campus = CampusMap()
 
 @app.route('/')

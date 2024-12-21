@@ -57,6 +57,9 @@
             padding: 2rem;
             border-radius: 15px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            min-height: 600px;
+            display: flex;
+            flex-direction: column;
         }
 
         .input-group {
@@ -124,9 +127,10 @@
             border-radius: 8px;
             background-color: #f8f9fa;
             border: 2px solid #e0e0e0;
+            max-height: 400px;
+            overflow-y: auto;
         }
 
-        /* SVG Map Styles */
         .map-svg {
             width: 100%;
             height: 500px;
@@ -138,28 +142,61 @@
             fill: var(--secondary-color);
             r: 8;
             transition: all 0.3s ease;
+            opacity: 0.7;
         }
 
-        .room-node:hover {
+        .room-node.active {
             fill: var(--accent-color);
             r: 10;
+            opacity: 1;
         }
 
         .room-label {
             font-size: 12px;
             fill: var(--secondary-color);
+            opacity: 0.7;
+        }
+
+        .room-label.active {
+            opacity: 1;
+            font-weight: bold;
         }
 
         .path-line {
-            stroke: #ccc;
-            stroke-width: 2;
-        }
-
-        .highlighted-path {
             stroke: var(--accent-color);
             stroke-width: 3;
             stroke-dasharray: 5;
             animation: dash 1s linear infinite;
+        }
+
+        .stairs-icon {
+            fill: var(--primary-color);
+        }
+
+        .direction-step {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.5rem;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .step-number {
+            background-color: var(--primary-color);
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        .step-icon {
+            color: var(--primary-color);
+            font-size: 1.2rem;
         }
 
         @keyframes dash {
@@ -168,25 +205,14 @@
             }
         }
 
-        .legend {
-            margin-top: 1rem;
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-        }
+        @media (max-width: 1024px) {
+            .content-wrapper {
+                flex-direction: column;
+            }
 
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.9rem;
-            color: var(--secondary-color);
-        }
-
-        .legend-color {
-            width: 20px;
-            height: 3px;
-            border-radius: 3px;
+            .controls-container, .map-container {
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -243,118 +269,103 @@
         </div>
 
         <div class="map-container">
-            <svg class="map-svg" viewBox="0 0 600 500">
-                <g id="paths"></g>
-                <g id="rooms"></g>
-                <g id="labels"></g>
-                <g id="highlighted-path"></g>
-            </svg>
-            <div class="legend">
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #ccc;"></div>
-                    <span>Available Path</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: var(--accent-color);"></div>
-                    <span>Selected Route</span>
-                </div>
-            </div>
+            <svg class="map-svg" viewBox="0 0 600 500"></svg>
         </div>
     </div>
 
     <script>
-        function drawMap(data) {
-            const pathsGroup = document.getElementById('paths');
-            const roomsGroup = document.getElementById('rooms');
-            const labelsGroup = document.getElementById('labels');
-            const highlightedGroup = document.getElementById('highlighted-path');
-            
-            // Clear previous content
-            pathsGroup.innerHTML = '';
-            roomsGroup.innerHTML = '';
-            labelsGroup.innerHTML = '';
-            highlightedGroup.innerHTML = '';
+        // SVG namespace
+        const SVG_NS = "http://www.w3.org/2000/svg";
 
-            // Draw all paths
-            data.all_paths.forEach(([start, end]) => {
-                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        // Stairs icon path data
+        const STAIRS_ICON = "M 0,0 L 2,0 L 2,-2 L 4,-2 L 4,-4 L 6,-4 L 6,-6 L 8,-6";
+
+        function createStairsIcon(x1, y1, x2, y2) {
+            const group = document.createElementNS(SVG_NS, 'g');
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+            
+            const path = document.createElementNS(SVG_NS, 'path');
+            path.setAttribute('d', STAIRS_ICON);
+            path.setAttribute('class', 'stairs-icon');
+            path.setAttribute('transform', `translate(${midX-4},${midY+3}) scale(2)`);
+            
+            group.appendChild(path);
+            return group;
+        }
+
+        function drawMap(data) {
+            const svg = document.querySelector('.map-svg');
+            svg.innerHTML = ''; // Clear previous content
+            
+            // Create groups
+            const pathsGroup = document.createElementNS(SVG_NS, 'g');
+            const roomsGroup = document.createElementNS(SVG_NS, 'g');
+            const labelsGroup = document.createElementNS(SVG_NS, 'g');
+            const stairsGroup = document.createElementNS(SVG_NS, 'g');
+            
+            // Draw paths
+            data.relevant_paths.forEach(({start, end, type}) => {
+                const line = document.createElementNS(SVG_NS, 'line');
                 line.setAttribute('x1', start.x);
                 line.setAttribute('y1', start.y);
                 line.setAttribute('x2', end.x);
                 line.setAttribute('y2', end.y);
                 line.setAttribute('class', 'path-line');
                 pathsGroup.appendChild(line);
+
+                if (type === 'stairs') {
+                    const stairsIcon = createStairsIcon(start.x, start.y, end.x, end.y);
+                    stairsGroup.appendChild(stairsIcon);
+                }
             });
 
-            // Draw highlighted path
-            if (data.path) {
-                for (let i = 0; i < data.path.length - 1; i++) {
-                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                    line.setAttribute('x1', data.path[i].x);
-                    line.setAttribute('y1', data.path[i].y);
-                    line.setAttribute('x2', data.path[i + 1].x);
-                    line.setAttribute('y2', data.path[i + 1].y);
-                    line.setAttribute('class', 'highlighted-path');
-                    highlightedGroup.appendChild(line);
-                }
-            }
-
-            // Draw all rooms
-            data.all_rooms.forEach(room => {
-                // Draw room node
-                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            // Draw rooms and labels
+            data.path.forEach(room => {
+                const circle = document.createElementNS(SVG_NS, 'circle');
                 circle.setAttribute('cx', room.x);
                 circle.setAttribute('cy', room.y);
-                circle.setAttribute('class', 'room-node');
-                circle.setAttribute('data-room-id', room.id);
+                circle.setAttribute('class', 'room-node active');
                 roomsGroup.appendChild(circle);
 
-                // Add room label
-                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                text.setAttribute('x', room.x + 15);
-                text.setAttribute('y', room.y + 5);
-                text.setAttribute('class', 'room-label');
+                const text = document.createElementNS(SVG_NS, 'text');
+                text.setAttribute('x', parseInt(room.x) + 15);
+                text.setAttribute('y', parseInt(room.y) + 5);
+                text.setAttribute('class', 'room-label active');
                 text.textContent = `${room.id} - ${room.description}`;
                 labelsGroup.appendChild(text);
             });
 
-            // Add hover effects for rooms
-            const rooms = document.querySelectorAll('.room-node');
-            rooms.forEach(room => {
-                room.addEventListener('mouseover', () => {
-                    const roomId = room.getAttribute('data-room-id');
-                    const label = document.querySelector(`text:contains('${roomId}')`);
-                    if (label) {
-                        label.style.fontWeight = 'bold';
-                    }
-                });
-                room.addEventListener('mouseout', () => {
-                    const roomId = room.getAttribute('data-room-id');
-                    const label = document.querySelector(`text:contains('${roomId}')`);
-                    if (label) {
-                        label.style.fontWeight = 'normal';
-                    }
-                });
-            });
+            // Add all groups to SVG
+            svg.appendChild(pathsGroup);
+            svg.appendChild(stairsGroup);
+            svg.appendChild(roomsGroup);
+            svg.appendChild(labelsGroup);
         }
 
-        // Function to update directions text
         function updateDirections(directions) {
             const directionsDiv = document.getElementById('directions');
             if (directions && directions.length > 0) {
-                const directionsList = directions.map((step, index) => `
-                    <div class="direction-step">
-                        <div class="step-number">${index + 1}</div>
-                        <div>${step}</div>
-                    </div>
-                `).join('');
+                const directionsList = directions.map((step, index) => {
+                    let iconClass = 'fa-person-walking';
+                    if (step.toLowerCase().includes('stairs')) {
+                        iconClass = 'fa-stairs';
+                    }
+                    
+                    return `
+                        <div class="direction-step">
+                            <div class="step-number">${index + 1}</div>
+                            <i class="fas ${iconClass} step-icon"></i>
+                            <div>${step}</div>
+                        </div>
+                    `;
+                }).join('');
                 directionsDiv.innerHTML = directionsList;
             } else {
                 directionsDiv.innerHTML = 'Select your current location and destination to get directions.';
             }
         }
 
-        // Main function to get directions and update the map
         function getDirections() {
             const startRoom = document.getElementById('start-room').value;
             const endRoom = document.getElementById('end-room').value;
@@ -380,10 +391,7 @@
                     document.getElementById('directions').innerHTML = data.error;
                     return;
                 }
-                
-                // Draw the map with the new path
                 drawMap(data);
-                // Update the text directions
                 updateDirections(data.directions);
             })
             .catch(error => {
@@ -393,9 +401,13 @@
             });
         }
 
-        // Initialize the map when the page loads
+        // Initialize empty map on page load
         window.onload = function() {
-            getDirections();
+            const startRoom = document.getElementById('start-room');
+            const endRoom = document.getElementById('end-room');
+            if (startRoom.value && endRoom.value) {
+                getDirections();
+            }
         };
     </script>
 </body>
