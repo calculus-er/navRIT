@@ -54,7 +54,6 @@ class CampusMap:
             ("AB210", "Office Of Chief Executive", 650, 50, 0),
             ("AB211", "Room", 600, 100, 0),
             ("AB212", "Gents Washroom", 625, 250, 0),
-            ("Garden", "Garden", 300, 200, 0),
             ("AB213", "Admission & Scholarship", 450, 250, 0),
             ("AB214", "Accounts & Purchase", 400, 300, 0),
             ("R_Stairs_1", "Library",500, 400, 0)

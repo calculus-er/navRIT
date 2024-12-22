@@ -344,6 +344,27 @@
                 width: 100%;
             }
         }
+        .search-input {
+        width: 100%;
+        padding: 1rem 1rem 1rem 3rem;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        background: var(--card-color);
+        color: var(--text-color);
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(42, 157, 143, 0.1);
+    }
+
+    /* Hide the default dropdown arrow for datalist */
+    input::-webkit-calendar-picker-indicator {
+        opacity: 0;
+    }
     </style>
 </head>
 <body>
@@ -367,8 +388,15 @@
             <div class="input-group">
                 <label for="start-room">Current Location</label>
                 <i class="fas fa-map-marker-alt"></i>
-                <select id="start-room">
-                    <option value="">Select Starting Room</option>
+                <div class="search-select-container">
+                    <input 
+                        list="rooms-list" 
+                        id="start-room" 
+                        class="search-input" 
+                        placeholder="Search or select starting room"
+                        autocomplete="off">
+                    <datalist id="rooms-list">
+                        <option value="">Select Starting Room</option>
                     <option value="main_entrance"> Main Entrance</option>
                     <option value="entrance_hall">Entrance Hall</option>
                     <option value="esb_entrance">ESB Entrance</option>
@@ -388,34 +416,21 @@
                     <option value="AB213">AB-213 Admission And Scholarship Section</option>
                     <option value="AB214">AB-214 Accounts And Purchase</option>
                     <option value="R_Stairs_1">Right Stairs 1</option>
-                </select>
+                    </datalist>
+                </div>
             </div>
-
+            
             <div class="input-group">
                 <label for="end-room">Destination</label>
                 <i class="fas fa-location-dot"></i>
-                <select id="end-room">
-                    <option value="">Select Destination Room</option>
-                    <option value="main_entrance">Main Entrance</option>
-                    <option value="entrance_hall">Entrance Hall</option>
-                    <option value="esb_entrance">ESB Entrance</option>
-                    <option value="des_entrance">DES Entrance</option>
-                    <option value="L_Stairs_1">Left Stairs 1</option>
-                    <option value="AB201">AB-201 Principle Office</option>
-                    <option value="AB202">AB-202 Chief Finance Office</option>
-                    <option value="AB203">AB-203 Registar Office For Acadmics</option>
-                    <option value="AB204">AB-204 Registar Office For Admission</option>
-                    <option value="AB205">AB-205</option>
-                    <option value="AB206">AB-206 Chief Acadmic Advisor</option>
-                    <option value="AB208">AB-208 Girls Washroom</option>
-                    <option value="AB209">AB-209 Vice Priciple Office</option>
-                    <option value="AB210">AB-210 Office Of Chief Executive</option>
-                    <option value="AB211">AB-211</option>
-                    <option value="AB212">AB-212 Gents Washroom</option>
-                    <option value="AB213">AB-213 Admission And Scholarship Section</option>
-                    <option value="AB214">AB-214 Accounts And Purchase</option>
-                    <option value="R_Stairs_1">Right Stairs 1</option>
-                </select>
+                <div class="search-select-container">
+                    <input 
+                        list="rooms-list" 
+                        id="end-room" 
+                        class="search-input" 
+                        placeholder="Search or select destination"
+                        autocomplete="off">
+                </div>
             </div>
 
             <button onclick="getDirections()">
@@ -518,61 +533,105 @@
 
 
         function drawMap(data) {
-            const svg = d3.select('.map-svg');
-            svg.html(''); // Clear previous content
-        
-            const svgWidth = svg.node().clientWidth;
-            const svgHeight = svg.node().clientHeight;
-        
-            // Define the clip path
-            svg.append('defs')
-                .append('clipPath')
-                .attr('id', 'clip')
-                .append('rect')
-                .attr('width', svgWidth)
-                .attr('height', svgHeight);
-        
-            // Add zoom and pan functionality
-            const zoom = d3.zoom()
-                .scaleExtent([0.5, 8]) // Increased zoom out limit (0.5)
-                .translateExtent([[-svgWidth, -svgHeight], [2 * svgWidth, 2 * svgHeight]])
-                .on('zoom', (event) => {
-                    g.attr('transform', event.transform);
-                });
-            
-            svg.call(zoom);
-            
-            // Create groups with clipping path
-            const g = svg.append('g').attr('clip-path', 'url(#clip)');
-            
-            // Draw paths
-            data.relevant_paths.forEach(({start, end, type}) => {
-                g.append('line')
-                    .attr('x1', start.x)
-                    .attr('y1', start.y)
-                    .attr('x2', end.x)
-                    .attr('y2', end.y)
-                    .attr('class', 'path-line');
-            
-                if (type === 'stairs') {
-                    g.append(() => createStairsIcon(start.x, start.y, end.x, end.y));
-                }
-            });
-        
-            // Draw rooms and labels
-            data.path.forEach(room => {
-                g.append('circle')
-                    .attr('cx', room.x)
-                    .attr('cy', room.y)
-                    .attr('class', 'room-node active');
-            
-                g.append('text')
-                    .attr('x', room.x + 15)
-                    .attr('y', room.y + 5)
-                    .attr('class', 'room-label active')
-                    .text(`${room.id} - ${room.description}`);
-            });
+    const svg = d3.select('.map-svg');
+    svg.html(''); // Clear previous content
+
+    // Calculate the bounds of all points
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    // Include all room coordinates
+    data.path.forEach(room => {
+        minX = Math.min(minX, room.x);
+        minY = Math.min(minY, room.y);
+        maxX = Math.max(maxX, room.x);
+        maxY = Math.max(maxY, room.y);
+    });
+
+    // Add padding (20% of the range)
+    const padding = {
+        x: (maxX - minX) * 0.2,
+        y: (maxY - minY) * 0.2
+    };
+
+    // Set minimum view area (adjust these values as needed)
+    const minWidth = 600;
+    const minHeight = 400;
+
+    // Calculate actual dimensions with padding
+    let width = Math.max(minWidth, (maxX - minX) + (padding.x * 2));
+    let height = Math.max(minHeight, (maxY - minY) + (padding.y * 2));
+
+    // Center the content if the minimum dimensions are used
+    const xOffset = (width - (maxX - minX)) / 2;
+    const yOffset = (height - (maxY - minY)) / 2;
+
+    // Update viewBox to fit all points with padding and minimum dimensions
+    const viewBox = [
+        minX - xOffset,
+        minY - yOffset,
+        width,
+        height
+    ].join(' ');
+    
+    svg.attr('viewBox', viewBox)
+       .attr('preserveAspectRatio', 'xMidYMid meet');
+
+    // Define the clip path
+    svg.append('defs')
+        .append('clipPath')
+        .attr('id', 'clip')
+        .append('rect')
+        .attr('x', minX - xOffset)
+        .attr('y', minY - yOffset)
+        .attr('width', width)
+        .attr('height', height);
+
+    // Add zoom and pan functionality
+    const zoom = d3.zoom()
+        .scaleExtent([0.5, 8])
+        .on('zoom', (event) => {
+            g.attr('transform', event.transform);
+        });
+
+    svg.call(zoom);
+    
+    // Create groups with clipping path
+    const g = svg.append('g').attr('clip-path', 'url(#clip)');
+
+    // Draw paths
+    data.relevant_paths.forEach(({start, end, type}) => {
+        g.append('line')
+            .attr('x1', start.x)
+            .attr('y1', start.y)
+            .attr('x2', end.x)
+            .attr('y2', end.y)
+            .attr('class', 'path-line');
+
+        if (type === 'stairs') {
+            g.append(() => createStairsIcon(start.x, start.y, end.x, end.y));
         }
+    });
+
+    // Draw rooms and labels
+    data.path.forEach(room => {
+        g.append('circle')
+            .attr('cx', room.x)
+            .attr('cy', room.y)
+            .attr('class', 'room-node active');
+
+        g.append('text')
+            .attr('x', room.x + 15)
+            .attr('y', room.y + 5)
+            .attr('class', 'room-label active')
+            .text(`${room.id} - ${room.description}`);
+    });
+
+    // Initial zoom to fit content
+    const initialTransform = d3.zoomIdentity
+        .translate(0, 0)
+        .scale(1);
+    svg.call(zoom.transform, initialTransform);
+}
 
         function updateDirections(directions) {
             const directionsDiv = document.getElementById('directions');
@@ -631,6 +690,50 @@
                     'Error getting directions. Please try again.';
             });
         }
+        const validRooms = {
+    'main_entrance': 'Main Entrance',
+    'entrance_hall': 'Entrance Hall',
+    'esb_entrance': 'ESB Entrance',
+    'des_entrance': 'DES Entrance',
+    'L_Stairs_1': 'Left Stairs',
+    'AB201': 'Principle Office',
+    'AB202': 'Chief Finance Office',
+    'AB203': 'Registar Office (Acadmics)',
+    'AB204': 'Registar Office (Admissions)',
+    'AB205': 'Room',
+    'AB206': 'Chief Acadmic Advisor',
+    'AB208': 'Ladies Washroom',
+    'AB209': 'Vice Principle Office',
+    'AB210': 'Office Of Chief Executive',
+    'AB211': 'Room',
+    'AB212': 'Gents Washroom',
+    'AB213': 'Admission & Scholarship',
+    'AB214': 'Accounts & Purchase',
+    'R_Stairs_1': 'Library'
+};
+        function validateRoom(input) {
+    const value = input.value.trim().toUpperCase();
+    
+    // Check if the input matches any room ID
+    if (validRooms[value]) {
+        input.value = value;
+        return true;
+    }
+    
+    // Check if the input matches any room description
+    const matchingRoom = Object.entries(validRooms).find(([id, desc]) => 
+        desc.toLowerCase().includes(input.value.toLowerCase())
+    );
+    
+    if (matchingRoom) {
+        input.value = matchingRoom[0];
+        return true;
+    }
+    
+    return false;
+}
+
+        
         
     </script>
 </body>
