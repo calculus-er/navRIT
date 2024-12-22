@@ -38,16 +38,26 @@ class CampusMap:
         # Format: (room_id, description, x, y, floor)
         rooms = [
             # Apex first floor (floor 0)
-            ("G01", "Main Entrance", 100, 400, 0),
-            ("G02", "Reception", 300, 400, 0),
-            ("G03", "Cafeteria", 500, 400, 0),
-            ("G04", "Library", 300, 300, 0),
-            
-            # First Floor (floor 1)
-            ("101", "Computer Lab", 100, 200, 1),
-            ("102", "Physics Lab", 300, 200, 1),
-            ("103", "Chemistry Lab", 500, 200, 1),
-            ("104", "Classroom", 500, 100, 1)
+            ("main_entrance", "", 300, 500, 0),
+            ("entrance_hall", "", 300, 400, 0),
+            ("esb_entrance", "", 100, 500, 0),
+            ("des_entrance", "", 500, 500, 0),
+            ("L_Stairs_1", "left stairs", 100,400 , 0),
+            ("AB201", "Principle Office", 200, 300, 0),
+            ("AB202", "Chief Finance Office ", 00, 300, 0),
+            ("AB203", "Registar Office (Acadmics) ", 100, 200, 0),
+            ("AB204", "Registar Office (Admissions)", 200, 100, 0),
+            ("AB205", "Room", 300,0, 0),
+            ("AB206", "Chief Acadmic Advisor", 400, 100, 0),
+            ("AB208", "Ladies Washroom", 450, 150, 0),
+            ("AB209", "Vice Principle Office ", 500,200, 0),
+            ("AB210", "Office Of Chief Executive", 650, 50, 0),
+            ("AB211", "Room", 600, 100, 0),
+            ("AB212", "Gents Washroom", 625, 250, 0),
+            ("Garden", "Garden", 300, 200, 0),
+            ("AB213", "Admission & Scholarship", 450, 250, 0),
+            ("AB214", "Accounts & Purchase", 400, 300, 0),
+            ("R_Stairs_1", "Library",500, 400, 0)
         ]
         
         # Add rooms with coordinates and floor information
@@ -56,14 +66,28 @@ class CampusMap:
         
         # Add connections with type (normal/stairs)
         connections = [
-            ("G01", "G02", "normal"),  # Main Entrance to Reception
-            ("G02", "G03", "normal"),  # Reception to Cafeteria
-            ("G02", "G04", "normal"),  # Reception to Library
-            ("G03", "G04", "normal"),  # Cafeteria to Library
-            ("G02", "102", "stairs"),  # Reception to Physics Lab (stairs)
-            ("101", "102", "normal"),  # Computer Lab to Physics Lab
-            ("102", "103", "normal"),  # Physics Lab to Chemistry Lab
-            ("103", "104", "normal")   # Chemistry Lab to Classroom
+            # ("init", "end", "normal"),  # Reception to Cafeteria
+            ("main_entrance", "entrance_hall", "normal"),  
+            ("entrance_hall", "esb_entrance", "normal"),
+            ("entrance_hall", "des_entrance", "normal"),
+            ("entrance_hall", "AB214", "normal"),
+            ("entrance_hall", "L_Stairs_1", "normal"),
+            ("entrance_hall", "R_Stairs_1", "normal"),
+            ("entrance_hall", "AB201", "normal"),
+            ("AB201", "AB203", "normal"),
+            ("AB203", "AB202", "normal"),
+            ("AB203", "AB204", "normal"),
+            ("AB204", "AB205", "normal"),
+            ("AB205", "AB206", "normal"),
+            ("AB206", "AB208", "normal"),
+            ("AB208", "AB209", "normal"),
+            ("AB209", "AB210", "normal"),
+            ("AB214", "AB213", "normal"),
+            ("AB213", "AB209", "normal"),
+            ("R_Stairs_2", "AB206", "normal"),
+            ("AB209", "AB211", "normal"),
+            ("AB209", "AB212", "normal"),
+            ("entrance_hall", "AB214", "normal"),
         ]
         
         # Add edges with connection type
