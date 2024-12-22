@@ -1,8 +1,32 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template 
 import networkx as nx
+import requests
 import math
-#we are using networkx library to create a graph of the campus map.
+
 app = Flask(__name__)
+
+@app.route('/get_temperature', methods=['GET'])
+def get_temperature():
+    try:
+        location = 'Bengaluru,IN'
+        url = f'http://api.openweathermap.org/data/2.5/weather?q={location}&appid={"0988b7fa5bf2ff758adb0a4ef56d6245"}&units=metric'
+
+        
+        response = requests.get(url)
+        if response.status_code == 200:
+            weather_data = response.json()
+            temp = round(weather_data['main']['temp'])  # Round to nearest integer
+            return jsonify({
+                'temperature': temp,
+                'unit': '°C'
+            })
+        else:
+            return jsonify({'error': 'Unable to fetch temperature data'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Your existing routes and functions
+
 
 class CampusMap:
     def __init__(self):
@@ -13,7 +37,7 @@ class CampusMap:
         # Rooms with coordinates and floor information
         # Format: (room_id, description, x, y, floor)
         rooms = [
-            # Ground Floor (floor 0)
+            # Apex first floor (floor 0)
             ("G01", "Main Entrance", 100, 400, 0),
             ("G02", "Reception", 300, 400, 0),
             ("G03", "Cafeteria", 500, 400, 0),
